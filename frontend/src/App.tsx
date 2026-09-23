@@ -1,4 +1,11 @@
 import { useState } from 'react';
+import confetti from 'canvas-confetti';
+
+function fireConfetti() {
+  confetti({ particleCount: 120, spread: 75, origin: { y: 0.6 } });
+  setTimeout(() => confetti({ particleCount: 60, angle: 60, spread: 55, origin: { x: 0 } }), 150);
+  setTimeout(() => confetti({ particleCount: 60, angle: 120, spread: 55, origin: { x: 1 } }), 150);
+}
 
 type FormState = { claimDescription: string; coverage: string; deductible: string; proposedAmount: string; coffeeOffer: string };
 
@@ -21,6 +28,7 @@ export function App() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? 'Noe gikk galt.');
       setReview(data.review);
+      fireConfetti();
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Noe gikk galt.'); }
     finally { setLoading(false); }
   }
