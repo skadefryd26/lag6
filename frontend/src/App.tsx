@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 
 function skytKonfetti() {
@@ -34,6 +34,16 @@ export function App() {
   const [error, setError] = useState('');
   const [view, setView] = useState<'handler' | 'leader'>('handler');
   const [leaderUnlocked, setLeaderUnlocked] = useState(false);
+  const [screenShaking, setScreenShaking] = useState(false);
+  const [isBribeInFlight, setIsBribeInFlight] = useState(false);
+
+  useEffect(() => {
+    if (newVerdict && newVerdict.rating <= 3) {
+      setScreenShaking(true);
+      const timer = setTimeout(() => setScreenShaking(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [newVerdict]);
 
   function reset() { setCoverageDecision(null); setAction(null); setVerdict(null); setNewVerdict(null); setError(''); }
   function chooseClaim(index: number) { if (loading) return; setClaimIndex(index); setForm(emptyForm(claims[index])); reset(); }
@@ -42,14 +52,20 @@ export function App() {
     if (nextAction === 'send-payout' && nextCoverage !== 'approve') return;
     const isBribe = nextAction === 'bribe-offer';
     if (!isBribe) { setAction(nextAction); setVerdict(null); }
+    setIsBribeInFlight(isBribe);
     setNewVerdict(null); setLoading(true); setError('');
     try {
       const response = await fetch('/api/review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...claim, ...form, action: nextAction, coverageDecision: nextCoverage, proposedAmount: Number(form.proposedAmount.replace(/\s/g, '')), bribePercent: Number(form.bribePercent) || 0, bribeAmount: Number(form.bribeAmount.replace(/\s/g, '')) || 0 }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? 'Noe gikk galt.');
       const result = { text: data.review as string, rating: typeof data.rating === 'number' ? data.rating : 3 };
-      if (isBribe) setNewVerdict(result); else setVerdict(result);
-      skytKonfetti();
+      if (isBribe) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        setNewVerdict(result);
+        if (result.rating > 3) skytKonfetti();
+      } else {
+        setVerdict(result);
+      }
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Noe gikk galt.'); }
     finally { setLoading(false); }
   }
@@ -62,7 +78,8 @@ export function App() {
 
   const latest = newVerdict ?? verdict;
 
-  return <main>
+  return <main className={screenShaking ? 'screen-shake' : ''}>
+    {loading && <div className="loading-overlay"><CoffeeSpinner large text={isBribeInFlight ? '«Å, penger? Vent, æ må telle først …»' : '«Vent litt. Æ skal først forstå ka du nettopp gjorde.»'} /></div>}
     <div className="topline"><span className="dot" /> SKADEFRYD / INTERN KONTROLL <nav><button className={view === 'handler' ? 'nav-active' : ''} onClick={() => setView('handler')}>SKADEBEHANDLER</button><button className={view === 'leader' ? 'nav-active' : ''} onClick={() => setView('leader')}>LEDERFANE 🔒</button></nav></div>
     <section className="hero"><div><p className="eyebrow">Bjarne følger med</p><h1>Gjør jobben.<br /><em>Ta konsekvensen.</em></h1><p className="intro">En fiktiv kontrollør som venter til du har bestemt deg, før han mener svært mye om valget ditt.</p></div><div className="badge">NORD<br /><strong>NO</strong></div></section>
     <div className="notice">⚠ FIKTIV DEMO <span>Dette påvirker ingen ekte skade, kunde, lønn eller utbetaling.</span></div>
@@ -72,8 +89,7 @@ export function App() {
         <section className="card claim-card"><div className="card-title"><h2>Skademelding <small className="claim-number">{claim.number}</small></h2></div><div className="claim-id">FIKTIV SAK · SKADEBEHANDLER: {claim.handler}</div><h3>{claim.title}</h3><p className="claim-copy">{claim.description}</p><div className="facts"><div><small>DEKNING</small><strong>{claim.coverage}</strong></div><div><small>EGENANDEL</small><strong>{claim.deductible}</strong></div></div><div className="claimant">{claim.claimant}</div></section>
       </div>
       <div className="handling-column"><section className="card action-card"><div className="card-title"><h2>Dekningsbeslutning</h2></div><p className="helper"><strong>Godkjenn dekning</strong> når skaden faller innenfor dekningen. <strong>Avslå dekning</strong> når vilkårene ikke gjelder. Bjarne får se saken når du avslår eller sender til utbetaling.</p><div className="actions"><button className={`secondary ${coverageDecision === 'approve' ? 'selected' : ''}`} onClick={() => chooseCoverage('approve')} disabled={loading}>{coverageDecision === 'approve' ? '✓ ' : ''}GODKJENN DEKNING</button><button className={`danger ${coverageDecision === 'deny' ? 'selected' : ''}`} onClick={() => chooseCoverage('deny')} disabled={loading}>{coverageDecision === 'deny' ? '✓ ' : ''}AVSLÅ DEKNING</button></div>{coverageDecision === 'deny' && <p className="hint">Dekning er avslått, så saken går ikke til utbetaling.</p>}{coverageDecision === 'approve' && <div className="payout-step"><div className="step-label">UTBETALING TIL KUNDE</div><label>Foreslått erstatningsbeløp (kr)<input inputMode="numeric" value={form.proposedAmount} onChange={(e) => setForm({ ...form, proposedAmount: e.target.value })} /></label><p className="hint">Dekning er godkjent. Fyll inn beløpet og send det til utbetaling.</p><button className="primary" onClick={() => void decide('send-payout')} disabled={loading || !form.proposedAmount}>SEND TIL UTBETALING →</button></div>}</section>
-        {action && <section className="card bjarne-card"><div className="card-title"><h2>Bjarnes vurdering</h2></div>{loading && !verdict && <Thinking text="«Vent litt. Æ skal først forstå ka du nettopp gjorde.»" />}{verdict && <><VerdictView verdict={verdict} />{!newVerdict && <BribeBox mode={coverageDecision === 'deny' ? 'amount' : 'percent'} form={form} setForm={setForm} onBribe={() => void decide('bribe-offer')} loading={loading} />}</>}</section>}
-        {verdict && loading && <section className="card bjarne-card new-verdict"><Thinking text="«Å, penger? Vent, æ må telle først …»" /></section>}
+        {action && !newVerdict && <section className="card bjarne-card"><div className="card-title"><h2>Bjarnes vurdering</h2></div>{verdict && <><VerdictView verdict={verdict} /><BribeBox mode={coverageDecision === 'deny' ? 'amount' : 'percent'} form={form} setForm={setForm} onBribe={() => void decide('bribe-offer')} loading={loading} /></>}</section>}
         {newVerdict && <section className={`card bjarne-card new-verdict ${newVerdict.rating > 3 ? 'verdict-up' : 'verdict-down'}`}><div className="new-badge">NY VURDERING ETTER BETALING</div><div className="rating-change"><span>{verdict?.rating ?? 3}/10</span><span className="arrow">→</span><strong>{newVerdict.rating}/10</strong></div><VerdictView verdict={newVerdict} /></section>}
       </div>
     </div>}
@@ -81,8 +97,16 @@ export function App() {
   </main>;
 }
 
-function Thinking({ text }: { text: string }) {
-  return <div className="empty thinking"><div className="stamp">…</div><p>{text}</p><small>Bjarne vurderer akkurat denne handlingen.</small></div>;
+function CoffeeSpinner({ text, large }: { text: string; large?: boolean }) {
+  return <div className={`empty thinking coffee-thinking ${large ? 'coffee-thinking-large' : ''}`}>
+    <div className="coffee-cup" aria-hidden="true">
+      <div className="coffee-cup-liquid" />
+      <div className="coffee-spoon" />
+      <div className="coffee-cup-handle" />
+    </div>
+    <p>{text}</p>
+    <small>Bjarne rører sammen kaffe og en ny vurdering.</small>
+  </div>;
 }
 
 function VerdictView({ verdict }: { verdict: Verdict }) {
