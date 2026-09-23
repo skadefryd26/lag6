@@ -21,3 +21,4 @@
 .coffee-thinking-large .coffee-spoon{top:18px;width:6px;height:82px}
 .coffee-thinking-large .coffee-spoon::after{width:24px;height:24px;bottom:-10px}
 .coffee-thinking-large p{font-size:22px;max-width:420px}
+.hero h1{font-size:clamp(40px,6.6vw,80px);overflow-wrap:anywhere;hyphens:auto}

@@ -1,8 +1,21 @@
 import { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 
+// Stor feiring over hele skjermen når Bjarne blir fornøyd.
 function skytKonfetti() {
-  confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+  const colors = ['#f4d36a', '#b6e05d', '#ffffff', '#dd8c79', '#7fc8f8'];
+  const base = { colors, zIndex: 9999, disableForReducedMotion: true };
+  // Et stort smell fra midten.
+  confetti({ ...base, particleCount: 250, spread: 160, startVelocity: 55, scalar: 1.3, origin: { x: 0.5, y: 0.55 } });
+  const end = Date.now() + 3000;
+  (function frame() {
+    // Kanoner fra begge sider.
+    confetti({ ...base, particleCount: 8, angle: 60, spread: 70, startVelocity: 65, origin: { x: 0, y: 0.8 } });
+    confetti({ ...base, particleCount: 8, angle: 120, spread: 70, startVelocity: 65, origin: { x: 1, y: 0.8 } });
+    // Regn fra toppen, over hele bredden.
+    confetti({ ...base, particleCount: 6, angle: 270, spread: 180, startVelocity: 12, gravity: 0.7, ticks: 400, scalar: 1.2, origin: { x: Math.random(), y: -0.1 } });
+    if (Date.now() < end) requestAnimationFrame(frame);
+  })();
 }
 
 type Action = 'approve-coverage' | 'deny-coverage' | 'send-payout' | 'bribe-offer';
@@ -81,7 +94,7 @@ export function App() {
   return <main className={screenShaking ? 'screen-shake' : ''}>
     {loading && <div className="loading-overlay"><CoffeeSpinner large text={isBribeInFlight ? '«Å, penger? Vent, æ må telle først …»' : '«Vent litt. Æ skal først forstå ka du nettopp gjorde.»'} /></div>}
     <div className="topline"><span className="dot" /> SKADEFRYD / INTERN KONTROLL <nav><button className={view === 'handler' ? 'nav-active' : ''} onClick={() => setView('handler')}>SKADEBEHANDLER</button><button className={view === 'leader' ? 'nav-active' : ''} onClick={() => setView('leader')}>LEDERFANE 🔒</button></nav></div>
-    <section className="hero"><div><p className="eyebrow">Bjarne følger med</p><h1>Gjør jobben.<br /><em>Ta konsekvensen.</em></h1><p className="intro">En fiktiv kontrollør som venter til du har bestemt deg, før han mener svært mye om valget ditt.</p></div><div className="badge">NORD<br /><strong>NO</strong></div></section>
+    <section className="hero"><div><p className="eyebrow">Bjarne følger med</p><h1>Gjensidiges<br /><em>skadebehandlingssystem</em></h1><p className="intro">Et system der Bjarne tar ansvar</p></div><div className="badge">NORD<br /><strong>NO</strong></div></section>
     <div className="notice">⚠ FIKTIV DEMO <span>Dette påvirker ingen ekte skade, kunde, lønn eller utbetaling.</span></div>
     {view === 'leader' ? <LeaderView unlocked={leaderUnlocked} unlock={() => setLeaderUnlocked(true)} reviewed={Boolean(latest)} rating={latest?.rating ?? 3} handler={claim.handler} claimNumber={claim.number} /> : <div className="workflow">
       <div className="claim-column">
